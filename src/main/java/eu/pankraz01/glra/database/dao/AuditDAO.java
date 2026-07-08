@@ -66,9 +66,8 @@ public final class AuditDAO {
     public List<BlockEntry> loadRecentBlocks(int limit, Optional<String> player, Optional<String> level, Optional<Integer> actionCodeFilter) throws SQLException {
         List<BlockEntry> result = new ArrayList<>();
         final StringBuilder sql = new StringBuilder();
-        sql.append("SELECT b.time AS ts, u.name AS player_name, l.name AS level_name, b.x, b.y, b.z, m.name AS material_name, b.action AS action_code, a.name AS action_name ");
+        sql.append("SELECT b.time AS ts, u.name AS player_name, l.name AS level_name, b.x, b.y, b.z, m.name AS material_name, b.action AS action_code ");
         sql.append("FROM blocks b ");
-        sql.append("LEFT JOIN actions a ON a.id = b.action ");
         sql.append("LEFT JOIN materials m ON m.id = b.type ");
         sql.append("LEFT JOIN users u ON u.id = b.user ");
         sql.append("LEFT JOIN levels l ON l.id = b.level ");
@@ -107,7 +106,7 @@ public final class AuditDAO {
                             rs.getInt("z"),
                             rs.getString("material_name"),
                             rs.getInt("action_code"),
-                            rs.getString("action_name"),
+                            mapCodeToName(rs.getInt("action_code")),
                             mapBlockActionLabel(rs.getString("action_name"), rs.getInt("action_code"))
                     ));
                 }
@@ -175,11 +174,25 @@ public final class AuditDAO {
             case INTERACT_BLOCK -> "Interact";
             case KILL_ENTITY -> "Kill";
             case PLACE_BLOCK -> "Place";
-            case TNT_EXPLOSION -> "TNT Explosion";
-            case TNT_IGNITE -> "TNT Ignite";
-            case TNT_REDSTONE -> "TNT Redstone";
+            case IGNITE_TNT -> "TNT Ignite";
+            case EXPLODE_BLOCK -> "TNT Explosion";
+            case REMOVE_CREATE_MECHANISM -> "Create Remove";
+            case REMOVE_CREATE_CONTAINER -> "Container Remove";
             case UNKNOWN_BREAK, UNKNOWN -> "N/A";
             default -> "Other";
+        };
+    }
+    private static String mapCodeToName(int code) {
+        return switch (code) {
+            case 0 -> "BREAK_BLOCK";
+            case 1 -> "PLACE_BLOCK";
+            case 2 -> "INTERACT_BLOCK";
+            case 3 -> "KILL_ENTITY";
+            case 4 -> "IGNITE_TNT";
+            case 5 -> "REMOVE_CREATE_MECHANISM";
+            case 6 -> "REMOVE_CREATE_CONTAINER";
+            case 7 -> "EXPLODE_BLOCK";
+            default -> "UNKNOWN";
         };
     }
 }

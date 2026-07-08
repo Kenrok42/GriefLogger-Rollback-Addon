@@ -64,9 +64,8 @@ public final class Action {
     }
 
     public Kind kind() {
-        // Group action codes by how they affect the world state for rollback.
         return switch (actionType()) {
-            case BREAK_BLOCK, TNT_IGNITE, TNT_EXPLOSION, TNT_REDSTONE, UNKNOWN_BREAK -> Kind.BREAK;
+            case BREAK_BLOCK, IGNITE_TNT, EXPLODE_BLOCK, REMOVE_CREATE_MECHANISM, REMOVE_CREATE_CONTAINER, UNKNOWN_BREAK -> Kind.BREAK; // Огонь при откате должен удаляться (ставиться воздух)
             case PLACE_BLOCK -> Kind.PLACE;
             default -> Kind.OTHER;
         };
@@ -80,10 +79,11 @@ public final class Action {
         PLACE_BLOCK(1, "PLACE_BLOCK"),
         INTERACT_BLOCK(2, "INTERACT_BLOCK"),
         KILL_ENTITY(3, "KILL_ENTITY"),
-        TNT_IGNITE(4, "TNT_IGNITE"),
-        TNT_EXPLOSION(5, "TNT_EXPLOSION"),
-        TNT_REDSTONE(6, "TNT_REDSTONE"),
-        UNKNOWN_BREAK(7, "UNKNOWN_BREAK"),
+        IGNITE_TNT(4, "IGNITE_TNT"),
+        REMOVE_CREATE_MECHANISM(5, "REMOVE_CREATE_MECHANISM"),
+        REMOVE_CREATE_CONTAINER(6, "REMOVE_CREATE_CONTAINER"),
+        EXPLODE_BLOCK(7, "EXPLODE_BLOCK"),
+        UNKNOWN_BREAK(8, "UNKNOWN_BREAK"),
         UNKNOWN(-1, "UNKNOWN");
 
         public final int code;

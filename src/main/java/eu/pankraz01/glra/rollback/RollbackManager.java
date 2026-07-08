@@ -477,15 +477,28 @@ public class RollbackManager {
             return;
         }
 
-        Block target = switch (action.kind()) {
-            case BREAK -> blockFromName(action.oldMaterialName); // restore what was there before the break/fire
-            case PLACE -> blockFromName(action.oldMaterialName); // undo a placement by restoring the previous block
-            default -> blockFromName(action.oldMaterialName);
-        };
+        String materialToRestore = (action.kind() == Action.Kind.BREAK) ? action.materialName : action.oldMaterialName;
 
-        boolean ok = level.setBlock(pos, Objects.requireNonNull(target.defaultBlockState()), Block.UPDATE_ALL);
+        if (materialToRestore == null || materialToRestore.isBlank() || materialToRestore.equals("minecraft:air")) {
+            if (materialToRestore != null && !level.getBlockState(pos).isAir()) {
+                level.setBlock(pos, Blocks.AIR.defaultBlockState(), Block.UPDATE_ALL);
+            }
+            return;
+        }
+
+        boolean ok = false;
+        Block target = blockFromName(materialToRestore);
+
+
+        if (target != Blocks.AIR) {
+            Item item = BuiltInRegistries.ITEM.getOptional(safeBlockId(materialToRestore)).orElse(null);
+            if (item instanceof net.minecraft.world.item.BlockItem blockItem) {
+                ok = level.setBlock(pos, blockItem.getBlock().defaultBlockState(), Block.UPDATE_ALL);
+            }
+        }
+
         if (!ok) {
-            LOGGER.warn("Rollback: setBlock returned false at {} in {}", pos, levelKey == null ? "overworld" : levelKey.location());
+            LOGGER.warn("Rollback: setBlock returned false at {} in {} (material: {})", pos, levelKey == null ? "overworld" : levelKey.location(), materialToRestore);
         }
     }
 
@@ -765,15 +778,26 @@ public class RollbackManager {
     }
 
     private CompoundTag readItemTag(byte[] data) {
-        // Try gzip-compressed NBT first (what GriefLogger stores), then raw NBT as fallback.
+        if (data == null || data.length == 0) return null;
+
         try (DataInputStream dis = new DataInputStream(new GZIPInputStream(new ByteArrayInputStream(data)))) {
             return NbtIo.read(dis);
         } catch (Exception compressed) {
+
             try (DataInputStream dis = new DataInputStream(new ByteArrayInputStream(data))) {
                 return NbtIo.read(dis);
             } catch (Exception plain) {
-                LOGGER.warn("Rollback: could not decode item NBT ({} bytes)", data.length);
-                return null;
+
+                try {
+                    byte[] decodedBytes = Base64.getDecoder().decode(data);
+                    try (DataInputStream dis = new DataInputStream(new GZIPInputStream(new ByteArrayInputStream(decodedBytes)))) {
+                        return NbtIo.read(dis);
+                    } catch (Exception e) {
+                        return null;
+                    }
+                } catch (Exception e) {
+                    return null;
+                }
             }
         }
     }
@@ -783,18 +807,23 @@ public class RollbackManager {
         Item item = BuiltInRegistries.ITEM.getOptional(itemId).orElse(null);
         if (item == null) return ItemStack.EMPTY;
 
-        if (data != null && data.length > 0) {
-            CompoundTag tag = readItemTag(data);
-            if (tag != null) {
-                try {
-                    @SuppressWarnings("null")
-                    ItemStack stack = ItemStack.parseOptional(BUILTIN_PROVIDER, tag);
-                    if (!stack.isEmpty()) {
-                        return stack;
-                    }
-                } catch (Exception e) {
-                    LOGGER.warn("Rollback: failed to parse item NBT for {}", name, e);
+
+        if (data == null || data.length < 10 || data[0] == 0x00) {
+
+            return new ItemStack(item);
+        }
+
+
+        CompoundTag tag = readItemTag(data);
+        if (tag != null) {
+            try {
+                @SuppressWarnings("null")
+                ItemStack stack = ItemStack.parseOptional(BUILTIN_PROVIDER, tag);
+                if (!stack.isEmpty()) {
+                    return stack;
                 }
+            } catch (Exception e) {
+                LOGGER.warn("Rollback: failed to parse item NBT for {}", name, e);
             }
         }
 

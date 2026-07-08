@@ -70,13 +70,18 @@ public final class ActionDAO {
      * Load block actions since `sinceMillis`. Player filter is optional and matches the username.
      * Returns a list ordered by time DESC.
      */
+    /**
+     * Load block actions since `sinceMillis`. Player filter is optional and matches the username.
+     * Returns a list ordered by time DESC.
+     */
     public List<Action> loadBlockActions(long sinceMillis, Optional<String> player) throws SQLException {
         final List<Action> result = new ArrayList<>();
 
         final StringBuilder sql = new StringBuilder();
-        sql.append("SELECT b.time AS ts, b.user AS user_id, u.name AS player_name, b.level AS level_id, l.name AS level_name, b.x, b.y, b.z, b.type AS material_id, m.name AS material_name, b.action AS action_code, a.name AS action_name ");
+
+        sql.append("SELECT b.time AS ts, b.user AS user_id, u.name AS player_name, b.level AS level_id, l.name AS level_name, b.x, b.y, b.z, b.type AS material_id, m.name AS material_name, b.action AS action_code ");
         sql.append("FROM blocks b ");
-        sql.append("LEFT JOIN actions a ON a.id = b.action ");
+
         sql.append("LEFT JOIN materials m ON m.id = b.type ");
         sql.append("LEFT JOIN users u ON u.id = b.user ");
         sql.append("LEFT JOIN levels l ON l.id = b.level ");
@@ -102,7 +107,7 @@ public final class ActionDAO {
                     int materialId = rs.getInt("material_id");
                     String materialName = rs.getString("material_name");
                     int actionCode = rs.getInt("action_code");
-                    String actionName = rs.getString("action_name");
+                    String actionName = mapCodeToName(actionCode);
 
                     result.add(new Action(ts, userId, playerName, levelId, levelName, x, y, z, materialId, materialName, actionCode, actionName));
                 }
@@ -116,10 +121,9 @@ public final class ActionDAO {
             Action a = result.get(i);
             String key = a.coordKey();
 
-            // what was in the world before this action?
+
             a.oldMaterialName = currentState.getOrDefault(key, "minecraft:air");
 
-            // update the tracked state to what the world looked like after the action
             switch (a.kind()) {
                 case PLACE -> currentState.put(key, normalizeMaterial(a.materialName));
                 case BREAK -> currentState.put(key, "minecraft:air");
@@ -133,7 +137,6 @@ public final class ActionDAO {
     private static String normalizeMaterial(String materialName) {
         return (materialName == null || materialName.isEmpty()) ? "minecraft:air" : materialName;
     }
-
     /**
      * Load all known player usernames from the `users` table.
      */
@@ -172,5 +175,19 @@ public final class ActionDAO {
             }
         }
         return result;
+    }
+
+    private static String mapCodeToName(int code) {
+        return switch (code) {
+            case 0 -> "BREAK_BLOCK";
+            case 1 -> "PLACE_BLOCK";
+            case 2 -> "INTERACT_BLOCK";
+            case 3 -> "KILL_ENTITY";
+            case 4 -> "IGNITE_TNT";
+            case 5 -> "REMOVE_CREATE_MECHANISM";
+            case 6 -> "REMOVE_CREATE_CONTAINER";
+            case 7 -> "EXPLODE_BLOCK";
+            default -> "UNKNOWN";
+        };
     }
 }
